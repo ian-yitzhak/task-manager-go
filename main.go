@@ -55,6 +55,8 @@ func main() {
 		switch r.Method {
 		case http.MethodGet:
 			store.handleGet(w, r, id)
+		case http.MethodPut:
+			store.handleUpdate(w, r, id)
 		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -114,6 +116,36 @@ func (s *Store) handleCreate(w http.ResponseWriter, r *http.Request) {
 	s.nextID++
 
 	writeJSON(w, http.StatusCreated, task)
+}
+
+func (s *Store) handleUpdate(w http.ResponseWriter, r *http.Request, id int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	task, ok := s.tasks[id]
+	if !ok {
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
+	}
+
+	var input struct {
+		Title *string `json:"title"`
+		Done  *bool   `json:"done"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if input.Title != nil {
+		task.Title = *input.Title
+	}
+	if input.Done != nil {
+		task.Done = *input.Done
+	}
+	s.tasks[id] = task
+
+	writeJSON(w, http.StatusOK, task)
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {
