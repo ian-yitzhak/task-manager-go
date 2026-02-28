@@ -103,5 +103,73 @@ const indexHTML = `<!DOCTYPE html>
         </div>
         <ul class="task-list" id="taskList"></ul>
     </div>
+
+    <script>
+        const API = '/api/tasks';
+
+        async function loadTasks() {
+            const res = await fetch(API);
+            const tasks = await res.json();
+            // Sort by ID so newest appear at bottom
+            tasks.sort((a, b) => a.id - b.id);
+            const list = document.getElementById('taskList');
+            if (tasks.length === 0) {
+                list.innerHTML = '<div class="empty">No tasks yet. Add one above!</div>';
+                return;
+            }
+            list.innerHTML = tasks.map(t => taskHTML(t)).join('');
+        }
+
+        function taskHTML(t) {
+            return '<li class="task-item ' + (t.done ? 'done' : '') + '">' +
+                '<input type="checkbox" ' + (t.done ? 'checked' : '') +
+                ' onchange="toggleTask(' + t.id + ', this.checked)" />' +
+                '<span class="task-title">' + escapeHtml(t.title) + '</span>' +
+                '<button class="btn-delete" onclick="deleteTask(' + t.id + ')">Delete</button>' +
+                '</li>';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function addTask() {
+            const input = document.getElementById('taskInput');
+            const title = input.value.trim();
+            if (!title) return;
+
+            await fetch(API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title })
+            });
+            input.value = '';
+            loadTasks();
+        }
+
+        async function toggleTask(id, done) {
+            await fetch(API + '/' + id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ done })
+            });
+            loadTasks();
+        }
+
+        async function deleteTask(id) {
+            await fetch(API + '/' + id, { method: 'DELETE' });
+            loadTasks();
+        }
+
+        // Allow Enter key to add tasks
+        document.getElementById('taskInput').addEventListener('keydown', e => {
+            if (e.key === 'Enter') addTask();
+        });
+
+        // Load tasks on page load
+        loadTasks();
+    </script>
 </body>
 </html>`
