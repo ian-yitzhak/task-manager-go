@@ -33,6 +33,7 @@ func NewStore() *Store {
 func main() {
 	store := NewStore()
 
+	// API routes
 	http.HandleFunc("/api/tasks", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -45,6 +46,7 @@ func main() {
 	})
 
 	http.HandleFunc("/api/tasks/", func(w http.ResponseWriter, r *http.Request) {
+		// Extract ID from URL: /api/tasks/123
 		idStr := r.URL.Path[len("/api/tasks/"):]
 		id, err := strconv.Atoi(idStr)
 		if err != nil {
@@ -57,18 +59,24 @@ func main() {
 			store.handleGet(w, r, id)
 		case http.MethodPut:
 			store.handleUpdate(w, r, id)
+		case http.MethodDelete:
+			store.handleDelete(w, r, id)
 		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
 
+	// Serve frontend
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "Hello, Go CRUD App!")
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, indexHTML)
 	})
 
 	fmt.Println("Server running at http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
+
+// --- CRUD Handlers ---
 
 func (s *Store) handleList(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
@@ -146,6 +154,19 @@ func (s *Store) handleUpdate(w http.ResponseWriter, r *http.Request, id int) {
 	s.tasks[id] = task
 
 	writeJSON(w, http.StatusOK, task)
+}
+
+func (s *Store) handleDelete(w http.ResponseWriter, r *http.Request, id int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.tasks[id]; !ok {
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
+	}
+
+	delete(s.tasks, id)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {
