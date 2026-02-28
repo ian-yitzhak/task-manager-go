@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"sync"
 )
 
@@ -43,6 +44,22 @@ func main() {
 		}
 	})
 
+	http.HandleFunc("/api/tasks/", func(w http.ResponseWriter, r *http.Request) {
+		idStr := r.URL.Path[len("/api/tasks/"):]
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			http.Error(w, "Invalid task ID", http.StatusBadRequest)
+			return
+		}
+
+		switch r.Method {
+		case http.MethodGet:
+			store.handleGet(w, r, id)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "Hello, Go CRUD App!")
 	})
@@ -61,6 +78,19 @@ func (s *Store) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, tasks)
+}
+
+func (s *Store) handleGet(w http.ResponseWriter, r *http.Request, id int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	task, ok := s.tasks[id]
+	if !ok {
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, task)
 }
 
 func (s *Store) handleCreate(w http.ResponseWriter, r *http.Request) {
